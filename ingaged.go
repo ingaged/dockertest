@@ -3,9 +3,23 @@ package dockertest
 import (
 	"fmt"
 	"time"
+
+	"github.com/pborman/uuid"
 )
 
-func SetupSFTPContainer(sourceVolume, destVolume string, credentials string) (c ContainerID, ip string, port int, err error) {
+type SFTPCredentials struct {
+	Username string
+	Password string
+	UID      string
+}
+
+type SFTPConfig struct {
+	Credentials      SFTPCredentials
+	SourceVolumePath string
+	DestPath         string
+}
+
+func SetupSFTPContainer(config SFTPConfig) (c ContainerID, ip string, port int, err error) {
 	port = randInt(1024, 49150)
 	forward := fmt.Sprintf("%d:%d", port, 22)
 	if BindDockerToLocalhost != "" {
@@ -14,13 +28,18 @@ func SetupSFTPContainer(sourceVolume, destVolume string, credentials string) (c 
 
 	volume := ""
 
-	if sourceVolume != "" && destVolume != "" {
-		volume = fmt.Sprintf("-v %s:%s", sourceVolume, destVolume)
+	if config.SourceVolumePath != "" && config.DestPath != "" {
+		volume = fmt.Sprintf("-v %s:/home/%s/%s", config.SourceVolumePath, config.Credentials.Username, config.DestPath)
 	}
 
+	credentials := fmt.Sprintf("%s:%s:%s", config.Credentials.Username, config.Credentials.Password, config.Credentials.UID)
+
 	c, ip, err = setupContainer("atmoz/sftp", port, 10*time.Second, func() (string, error) {
-		res, err := run("--name", "ingaged-sftp-test", volume, "-p", forward, "-d", "atmoz/sftp", credentials)
-		return res, err
+		if volume != "" {
+			return run("--name", uuid.New(), volume, "-p", forward, "-d", "atmoz/sftp", credentials)
+		}
+
+		return run("--name", uuid.New(), "-p", forward, "-d", "atmoz/sftp", credentials)
 	})
 	return
 }
