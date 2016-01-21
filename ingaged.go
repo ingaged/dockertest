@@ -43,3 +43,19 @@ func SetupSFTPContainer(config SFTPConfig) (c ContainerID, ip string, port int, 
 	})
 	return
 }
+
+func SetupSSHContainer(password string) (c ContainerID, ip string, port int, err error) {
+	port = randInt(1024, 49150)
+	forward := fmt.Sprintf("%d:%d", port, 22)
+	if BindDockerToLocalhost != "" {
+		forward = "127.0.0.1:" + forward
+	}
+
+	credentials := fmt.Sprintf(`--env="ROOT_PASS=%s"`, password)
+
+	c, ip, err = setupContainer("million12/ssh", port, 10*time.Second, func() (string, error) {
+		return run("--name", uuid.New(), "-p", forward, credentials, "-d", "million12/ssh")
+	})
+
+	return
+}
